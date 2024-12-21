@@ -8,5 +8,6 @@ namespace OrderManagement.Core.Abstraction
         Order GetOrderById(int id);
         void UpdateOrder(Order order);
         void DeleteOrder(int orderId);
+        string? ConnectionString { get; set; }
     }
 }
