@@ -1,10 +1,14 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using OrderManagement.Core.Abstraction;
 using OrderManagement.Core.Implementation;
 using OrderManagement.Infrastructure.Factory;
 using OrderManagement.Infrastructure;
 using System.Data.SQLite;
 using System.IO;
+using OrderManagement.Core.Abstraction.Commands;
+using OrderManagement.Core.Implementation.Commands;
+using OrderManagement.Infrastructure.Data;
 
 class Program
 {
@@ -16,12 +20,15 @@ class Program
             .AddJsonFile("appsettings.json")
             .Build();
 
-        // Створення фабрики для логера та репозиторія
-        var loggerFactory = new LoggerFactory(configuration);
-        ILogger logger = loggerFactory.CreateLogger();
+        // Налаштування DI контейнера
+        var serviceCollection = new ServiceCollection();
+        ConfigureServices(serviceCollection, configuration);
+        var serviceProvider = serviceCollection.BuildServiceProvider();
 
-        var repositoryFactory = new RepositoryFactory(configuration);
-        IOrderRepository orderRepository = repositoryFactory.CreateOrderRepository();
+        // Отримання сервісів з DI контейнера
+        var logger = serviceProvider.GetRequiredService<ILogger>();
+        var orderRepository = serviceProvider.GetRequiredService<IOrderRepository>();
+        var orderNotifier = serviceProvider.GetRequiredService<OrderNotifier>();
 
         string dbPath = "orders.db"; // Шлях до бази даних
         logger.Log($"Шлях до бази даних: {Path.GetFullPath(dbPath)}");
@@ -64,15 +71,12 @@ class Program
                 .CalculateTotal()
                 .Build();
 
-            // Створення об'єкта OrderNotifier
-            var orderNotifier = new OrderNotifier();
-
             // Збереження замовлення в БД
             orderRepository.SaveOrder(order);
 
-            // Логування успішного збереження
+            // Логув��ння успішного збереження
             logger.Log($"Замовлення {order.Id} створено з сумою {order.TotalAmount}");
-            
+
             // Сповіщення про збереження замовлення
             orderNotifier.NotifyOrderSaved(order);
 
@@ -108,6 +112,37 @@ class Program
         }
     }
 
-    // Метод для створення таблиць бази даних
+    private static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+    {
+        // Register configuration
+        services.AddSingleton(configuration);
 
+        // Register loggers
+        services.AddSingleton<FileLogger>();
+        services.AddSingleton<ConsoleLogger>();
+
+        // Register repository dependencies
+        services.AddSingleton<ILogger, ConsoleLogger>();
+        services.AddSingleton<Func<IOrderRepository>>(sp => () => sp.GetRequiredService<IOrderRepository>());
+        services.AddSingleton<ICommandHandler, CommandHandler>();
+
+        // Register repository
+        services.AddSingleton<IOrderRepository, SQLiteOrderRepository>();
+
+        // Register OrderNotifier
+        services.AddSingleton<OrderNotifier>();
+
+        // Register commands
+        services.AddTransient<ICommand, GetOrderByIdCommand>();
+        services.AddTransient<ICommand, SaveOrderCommand>();
+        services.AddTransient<ICommand, UpdateOrderCommand>();
+    }
+}
+
+public static class ExceptionHandling
+{
+    public static void HandleException(Exception ex, ILogger logger)
+    {
+        logger.Log($"Error: {ex.Message}");
+    }
 }

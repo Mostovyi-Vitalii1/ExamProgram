@@ -6,12 +6,14 @@ namespace OrderManagement.Core.Implementation.Commands
 {
     public class CommandHandler : ICommandHandler
     {
-        private readonly IOrderRepository _repository;
+        private readonly Func<IOrderRepository> _orderRepositoryFactory;
 
-        public CommandHandler(IOrderRepository repository)
+        public CommandHandler(Func<IOrderRepository> orderRepositoryFactory)
         {
-            _repository = repository;
+            _orderRepositoryFactory = orderRepositoryFactory;
         }
+
+        private IOrderRepository OrderRepository => _orderRepositoryFactory();
 
         public void Handle(ICommand command)
         {
@@ -44,7 +46,7 @@ namespace OrderManagement.Core.Implementation.Commands
 
         private void SaveOrder(Order order)
         {
-            using var connection = new SqliteConnection(_repository.ConnectionString);
+            using var connection = new SqliteConnection(OrderRepository.ConnectionString);
             connection.Open();
 
             var command = connection.CreateCommand();
@@ -60,7 +62,7 @@ namespace OrderManagement.Core.Implementation.Commands
 
         private Order GetOrderById(int id)
         {
-            using var connection = new SqliteConnection(_repository.ConnectionString);
+            using var connection = new SqliteConnection(OrderRepository.ConnectionString);
             connection.Open();
 
             var command = connection.CreateCommand();
@@ -81,7 +83,7 @@ namespace OrderManagement.Core.Implementation.Commands
 
         private void UpdateOrder(Order order)
         {
-            using var connection = new SqliteConnection(_repository.ConnectionString);
+            using var connection = new SqliteConnection(OrderRepository.ConnectionString);
             connection.Open();
 
             var command = connection.CreateCommand();
@@ -98,7 +100,7 @@ namespace OrderManagement.Core.Implementation.Commands
 
         private void DeleteOrder(int orderId)
         {
-            using var connection = new SqliteConnection(_repository.ConnectionString);
+            using var connection = new SqliteConnection(OrderRepository.ConnectionString);
             connection.Open();
 
             var command = connection.CreateCommand();
